@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Media Summarizer</title>
+  <style>
+    /* ===== Theme tokens ===== */
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --primary: #2b6cb0;
+      --primary-strong: #1f4f82;
+      --accent: #38b2ac;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --danger: #e53e3e;
+      --success: #2f855a;
+      --border: #e5e7eb;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+      --radius: 12px;
+      --space: 14px;
+      --space-lg: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    h1,h2,h3 { margin: 0 0 var(--space); font-weight: 700; }
+    p { margin: 0 0 var(--space); color: var(--muted); }
+    a { color: var(--primary); }
+
+    .page { max-width: 1200px; margin: 0 auto; padding: var(--space-lg); }
+    .header { display:flex; align-items:center; justify-content:space-between; gap:var(--space); flex-wrap:wrap; margin-bottom:var(--space-lg); }
+    .badge { background:var(--primary); color:#fff; padding:6px 12px; border-radius:999px; font-size:13px; letter-spacing:0.01em; }
+
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-lg); }
+    @media (max-width:900px) { .grid{ grid-template-columns:1fr } }
+
+    .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:var(--space-lg); }
+
+    .toggle { display:inline-flex; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#fff; }
+    .toggle button { border:none; padding:10px 18px; background:transparent; color:var(--muted); cursor:pointer; font-weight:600; transition: background .2s, color .2s; }
+    .toggle button.active { background:var(--primary); color:#fff; }
+
+    .upload-area { border:2px dashed var(--border); border-radius:var(--radius); padding:var(--space-lg); text-align:center; background:#f9fafb; transition:border-color .2s, background .2s; cursor:pointer; }
+    .upload-area.hover { border-color:var(--primary); background:#ebf4ff; }
+    .upload-area.invalid { border-color:var(--danger); background:#fff5f5; }
+
+    .preview { margin-top:var(--space); background:#f8fafc; border:1px solid var(--border); border-radius:var(--radius); padding:var(--space); }
+    .preview video, .preview audio { width:100%; border-radius:8px; background:#000; }
+    .meta { font-size:14px; color:var(--muted); }
+
+    label { display:block; margin-bottom:6px; font-weight:600; }
+    select, input[type="file"] { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:15px; }
+
+    .pill-select { display:flex; gap:8px; flex-wrap:wrap; }
+    .pill { border:1px solid var(--border); border-radius:999px; padding:8px 14px; cursor:pointer; color:var(--muted); background:#fff; font-weight:600; }
+    .pill.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+    .actions { display:flex; gap:10px; margin-top:var(--space); flex-wrap:wrap; }
+    button { border:none; border-radius:10px; padding:12px 16px; font-weight:700; cursor:pointer; transition:transform .08s ease; }
+    button.primary { background:var(--primary); color:#fff; }
+    button.secondary { background:#eef2f7; color:var(--text); border:1px solid var(--border); }
+    button.ghost { background:transparent; color:var(--muted); border:1px dashed var(--border); }
+
+    .status { margin-top:var(--space); padding:12px; border-radius:10px; font-weight:600; }
+    .status.success { background:#f0fff4; color:var(--success); border:1px solid #c6f6d5; }
+    .status.error { background:#fff5f5; color:var(--danger); border:1px solid #fed7d7; }
+    .status.info { background:#ebf4ff; color:var(--primary); border:1px solid #c3dafe; }
+
+    .progress { width:100%; background:#e5e7eb; border-radius:999px; overflow:hidden; height:10px; margin-top:8px; }
+    .progress span { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--primary),var(--accent)); transition:width .2s ease; }
+
+    .result-card { border:1px solid var(--border); border-radius:var(--radius); padding:var(--space); background:#fdfdfd; margin-top:var(--space); }
+    .result-card header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .actions-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+    .actions-list li { display:flex; gap:10px; align-items:flex-start; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff; }
+
+    .copy-btn { border:none; background:#eef2f7; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:13px; }
+    details { margin-top:var(--space); border:1px solid var(--border); border-radius:var(--radius); padding:var(--space); background:#fff; }
+    summary { cursor:pointer; font-weight:700; }
+
+    .microcopy { font-size:13px; color:var(--muted); }
+    .hidden { display:none!important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <div class="badge" aria-label="Build ready">Production-ish</div>
+        <h1>Media Summarizer</h1>
+        <p>Upload audio, video or text, pick summarization settings, and get instant summaries with action items.</p>
+        <p class="microcopy">Configurable processing time note: usually 30–60s for ~10 minutes of media (first request may be longer while models load).</p>
+      </div>
+      <div class="microcopy">Max 2GB · Audio: mp3, wav, m4a, ogg · Video: mp4, webm, mov · Text: .txt</div>
+    </div>
+
+    <div class="grid">
+      <!-- Left column: upload + preview -->
+      <section class="card" aria-label="Upload panel">
+        <div class="field">
+          <label id="mediaTypeLabel">Choose input type</label>
+          <div class="toggle" role="group" aria-labelledby="mediaTypeLabel">
+            <button id="audioBtn" class="active" data-type="audio" aria-pressed="true">Audio</button>
+            <button id="videoBtn" data-type="video" aria-pressed="false">Video</button>
+            <button id="textBtn" data-type="text" aria-pressed="false">Text</button>
+          </div>
+        </div>
+
+        <div class="upload-area" id="dropArea" tabindex="0" role="button" aria-label="Upload area">
+          <h3>Drag & drop your file here</h3>
+          <p class="upload-hint">or click to choose a file (max 2GB)</p>
+          <p class="microcopy" id="acceptHint">Accepts mp3, wav, m4a, ogg</p>
+          <input type="file" id="fileInput" class="hidden" aria-label="File input">
+        </div>
+
+        <div id="preview" class="preview hidden" aria-live="polite"></div>
+        <div id="status" class="status info hidden"></div>
+        <div id="progressWrap" class="hidden">
+          <div class="progress"><span id="progressBar"></span></div>
+        </div>
+        <div class="microcopy" id="processingNote">Usually takes 30–60s for ~10 minutes of media.</div>
+      </section>
+
+      <!-- Right column: options + results -->
+      <section class="card" aria-label="Options and results">
+        <h3>Summarization options</h3>
+
+        <div class="field">
+          <label>Summary length</label>
+          <div class="pill-select" id="summaryLength">
+            <button class="pill active" data-value="short" aria-pressed="true">Small (1-2 lines)</button>
+            <button class="pill" data-value="medium" aria-pressed="false">Medium (4-6 lines)</button>
+            <button class="pill" data-value="long" aria-pressed="false">Long (detailed bullets)</button>
+          </div>
+        </div>
+
+        <div class="options-grid">
+          <div class="field">
+            <label for="language">Language</label>
+            <select id="language" aria-label="Language selector">
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="hi">Hindi</option>
+              <option value="zh">Chinese</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="actionItems" checked>
+              <span>Also extract action items</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="submitBtn" class="primary" disabled>Generate Summary</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="downloadBtn" class="ghost" disabled>Download JSON</button>
+        </div>
+
+        <!-- Results: default summary + pegasus + bart + actions -->
+        <div id="results" class="hidden">
+          <div class="result-card" id="defaultCard">
+            <header>
+              <div><strong>Default Summary</strong></div>
+              <button class="copy-btn" data-copy-target="summaryText">Copy</button>
+            </header>
+            <div id="summaryText" class="meta"></div>
+          </div>
+
+          <div class="result-card" id="pegasusCard">
+            <header>
+              <div><strong>Pegasus Summary</strong></div>
+              <button class="copy-btn" data-copy-target="pegasusText">Copy</button>
+            </header>
+            <div id="pegasusText" class="meta"></div>
+          </div>
+
+          <div class="result-card" id="bartCard">
+            <header>
+              <div><strong>BART Summary</strong></div>
+              <button class="copy-btn" data-copy-target="bartText">Copy</button>
+            </header>
+            <div id="bartText" class="meta"></div>
+          </div>
+
+          <div class="result-card" id="actionsCard">
+            <header>
+              <div><strong>Action items</strong></div>
+              <button class="copy-btn" data-copy-target="actionsText">Copy</button>
+            </header>
+            <ol id="actionsList" class="actions-list"></ol>
+            <div id="actionsText" class="hidden"></div>
+          </div>
+
+          <details id="transcriptBlock" class="hidden">
+            <summary>Transcript (optional)</summary>
+            <pre id="transcriptText" style="white-space: pre-wrap; margin-top: 8px; font-family: Menlo, monospace;"></pre>
+          </details>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // ===== Config =====
+    const BACKEND_URL = '/api/analyze';
+    const MAX_SIZE_BYTES = 2 * 1024 * 1024 * 1024;
+    const useMockApi = false; // set true to test without backend
+
+    // Elements
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressBar = document.getElementById('progressBar');
+    const submitBtn = document.getElementById('submitBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const summaryLengthEl = document.getElementById('summaryLength');
+    const languageSelect = document.getElementById('language');
+    const actionItemsChk = document.getElementById('actionItems');
+    const results = document.getElementById('results');
+
+    const summaryText = document.getElementById('summaryText');
+    const pegasusText = document.getElementById('pegasusText');
+    const bartText = document.getElementById('bartText');
+    const actionsList = document.getElementById('actionsList');
+    const actionsText = document.getElementById('actionsText');
+    const transcriptBlock = document.getElementById('transcriptBlock');
+    const transcriptText = document.getElementById('transcriptText');
+
+    const audioBtn = document.getElementById('audioBtn');
+    const videoBtn = document.getElementById('videoBtn');
+    const textBtn = document.getElementById('textBtn');
+    const acceptHint = document.getElementById('acceptHint');
+
+    // state
+    let mediaType = 'audio';
+    let selectedFile = null;
+    let summaryData = null;
+
+    // allowed exts
+    const ALLOWED = {
+      audio: { exts: ['mp3','wav','m4a','ogg'] },
+      video: { exts: ['mp4','webm','mov'] },
+      text:  { exts: ['txt'] }
+    };
+
+    // helpers
+    function setStatus(msg, type='info') {
+      statusEl.textContent = msg;
+      statusEl.className = `status ${type}`;
+      statusEl.classList.remove('hidden');
+    }
+    function clearStatus() { statusEl.classList.add('hidden'); }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024, sizes = ['B','KB','MB','GB','TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function resetUI() {
+      selectedFile = null;
+      summaryData = null;
+      fileInput.value = '';
+      preview.innerHTML = '';
+      preview.classList.add('hidden');
+      results.classList.add('hidden');
+      downloadBtn.disabled = true;
+      submitBtn.disabled = true;
+      clearStatus();
+      progressWrap.classList.add('hidden');
+      progressBar.style.width = '0%';
+      transcriptBlock.classList.add('hidden');
+      actionsList.innerHTML = '';
+      summaryText.textContent = '';
+      pegasusText.textContent = '';
+      bartText.textContent = '';
+    }
+
+    function setMediaType(type) {
+      mediaType = type;
+
+      audioBtn.classList.toggle('active', type === 'audio');
+      videoBtn.classList.toggle('active', type === 'video');
+      textBtn.classList.toggle('active', type === 'text');
+
+      audioBtn.setAttribute('aria-pressed', type === 'audio');
+      videoBtn.setAttribute('aria-pressed', type === 'video');
+      textBtn.setAttribute('aria-pressed', type === 'text');
+
+      if (type === 'audio') acceptHint.textContent = "Accepts mp3, wav, m4a, ogg";
+      if (type === 'video') acceptHint.textContent = "Accepts mp4, webm, mov";
+      if (type === 'text')  acceptHint.textContent = "Accepts plain text (.txt)";
+
+      // adapt file input accept attribute
+      if (type === 'audio') fileInput.accept = 'audio/*';
+      else if (type === 'video') fileInput.accept = 'video/*';
+      else fileInput.accept = '.txt,text/*';
+
+      // Clear invalid file
+      if (selectedFile && isAllowedFile(selectedFile, mediaType) !== true) {
+        resetUI();
+        setStatus('Previous file cleared because media type changed.', 'info');
+      }
+    }
+
+    function isAllowedFile(file, type) {
+      if (!file) return false;
+      if (file.size > MAX_SIZE_BYTES) return 'size';
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if (!ALLOWED[type].exts.includes(ext)) return 'type';
+      return true;
+    }
+
+    function updatePreview(file) {
+      preview.innerHTML = '';
+
+      if (mediaType === 'text') {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const snippet = document.createElement('pre');
+          snippet.textContent = (reader.result || "").substring(0, 500) + ((reader.result || "").length > 500 ? "\n\n[Truncated]" : "");
+          snippet.style.whiteSpace = "pre-wrap";
+          snippet.style.margin = "0";
+          preview.appendChild(snippet);
+        };
+        reader.readAsText(file);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `File: ${file.name} · Size: ${formatBytes(file.size)}`;
+        preview.appendChild(meta);
+
+        preview.classList.remove('hidden');
+        return;
+      }
+
+      const isAudio = mediaType === 'audio';
+      const url = URL.createObjectURL(file);
+      const el = document.createElement(isAudio ? 'audio' : 'video');
+      el.controls = true;
+      el.src = url;
+      preview.appendChild(el);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `File: ${file.name} · Size: ${formatBytes(file.size)} · Loading duration...`;
+      preview.appendChild(meta);
+
+      el.addEventListener('loadedmetadata', () => {
+        const duration = el.duration;
+        if (Number.isFinite(duration)) {
+          meta.textContent = `File: ${file.name} · Duration: ${duration.toFixed(1)}s · Size: ${formatBytes(file.size)}`;
+        } else {
+          meta.textContent = `File: ${file.name} · Size: ${formatBytes(file.size)}`;
+        }
+      }, { once: true });
+
+      preview.classList.remove('hidden');
+    }
+
+    function handleFile(file) {
+      const valid = isAllowedFile(file, mediaType);
+      if (valid === 'size') {
+        setStatus('File too large. Max 2GB.', 'error');
+        return;
+      }
+      if (valid === 'type') {
+        setStatus('Unsupported format for selected input type.', 'error');
+        return;
+      }
+      selectedFile = file;
+      updatePreview(file);
+      setStatus('Ready to generate summary.', 'success');
+      submitBtn.disabled = false;
+    }
+
+    function setLoading(isLoading) {
+      submitBtn.disabled = isLoading || !selectedFile;
+      resetBtn.disabled = isLoading;
+      dropArea.setAttribute('aria-busy', isLoading);
+      if (isLoading) {
+        setStatus('Processing…', 'info');
+        progressWrap.classList.remove('hidden');
+        let pct = 10;
+        const interval = setInterval(() => {
+          pct = Math.min(95, pct + Math.random() * 10);
+          progressBar.style.width = pct + '%';
+          if (!dropArea.getAttribute('aria-busy')) clearInterval(interval);
+        }, 400);
+      } else {
+        dropArea.removeAttribute('aria-busy');
+        progressBar.style.width = '100%';
+        setTimeout(() => progressWrap.classList.add('hidden'), 600);
+      }
+    }
+
+    function renderResults(data) {
+      summaryData = data;
+      // default summary
+      summaryText.textContent = data.summary || '';
+      // pegasus
+      pegasusText.textContent = data.pegasus_summary || 'Not available';
+      // bart
+      bartText.textContent = data.bart_summary || 'Not available';
+
+      // actions
+      actionsList.innerHTML = '';
+      const actions = data.action_items || [];
+      actionsText.textContent = actions.join('\n');
+      actions.forEach((item, idx) => {
+        const li = document.createElement('li');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `action-${idx}`;
+        checkbox.addEventListener('change', () => {
+          li.style.opacity = checkbox.checked ? 0.6 : 1;
+        });
+        const label = document.createElement('label');
+        label.setAttribute('for', checkbox.id);
+        label.textContent = item;
+        const copy = document.createElement('button');
+        copy.className = 'copy-btn';
+        copy.textContent = 'Copy';
+        copy.addEventListener('click', () => copyText(item, copy));
+        li.append(checkbox, label, copy);
+        actionsList.appendChild(li);
+      });
+
+      // transcript
+      if (data.transcript) {
+        transcriptText.textContent = data.transcript;
+        transcriptBlock.classList.remove('hidden');
+      } else {
+        transcriptBlock.classList.add('hidden');
+      }
+
+      results.classList.remove('hidden');
+      downloadBtn.disabled = false;
+      setStatus('Summary ready.', 'success');
+    }
+
+    async function copyText(text, button) {
+      try {
+        await navigator.clipboard.writeText(text);
+        if (button) {
+          const prev = button.textContent;
+          button.textContent = 'Copied';
+          setTimeout(() => button.textContent = prev, 1000);
+        }
+      } catch (_) {
+        alert('Copy failed.');
+      }
+    }
+
+    // Event bindings
+    dropArea.addEventListener('click', () => fileInput.click());
+    dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.classList.add('hover'); });
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropArea.classList.remove('hover');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      handleFile(file);
+    });
+    dropArea.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) handleFile(file); });
+
+    audioBtn.addEventListener('click', () => setMediaType('audio'));
+    videoBtn.addEventListener('click', () => setMediaType('video'));
+    textBtn.addEventListener('click', () => setMediaType('text'));
+
+    summaryLengthEl.addEventListener('click', (e) => {
+      if (e.target.classList.contains('pill')) {
+        [...summaryLengthEl.children].forEach(btn => {
+          btn.classList.toggle('active', btn === e.target);
+          btn.setAttribute('aria-pressed', btn === e.target);
+        });
+      }
+    });
+
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.copyTarget;
+        const el = document.getElementById(targetId);
+        if (el) copyText(el.textContent, btn);
+      });
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!summaryData) return;
+      const payload = {
+        pegasus_summary: summaryData.pegasus_summary || null,
+        bart_summary: summaryData.bart_summary || null,
+        summary: summaryData.summary || null,
+        action_items: summaryData.action_items || [],
+        transcript: summaryData.transcript || null,
+        duration_seconds: summaryData.duration_seconds || null,
+        mediaType,
+        fileName: selectedFile ? selectedFile.name : null,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'summary.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    resetBtn.addEventListener('click', () => resetUI());
+
+    submitBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      clearStatus();
+      setLoading(true);
+      progressBar.style.width = '20%';
+      const length = document.querySelector('#summaryLength .pill.active')?.dataset.value || 'short';
+      const formData = new FormData();
+
+      // For text files, read the content and send as a text file field so backend can pick it up (UploadFile)
+      if (mediaType === 'text') {
+        // We still append as 'file' (UploadFile) — browser will send the .txt file via FormData
+        formData.append('file', selectedFile, selectedFile.name);
+      } else {
+        formData.append('file', selectedFile, selectedFile.name);
+      }
+
+      formData.append('mediaType', mediaType);
+      formData.append('summaryLength', length);
+      formData.append('extractActions', actionItemsChk.checked ? 'true' : 'false');
+      formData.append('language', languageSelect.value);
+
+      try {
+        let data;
+        if (useMockApi) {
+          data = await new Promise(resolve => setTimeout(() => resolve({
+            pegasus_summary: 'Mock Pegasus summary.',
+            bart_summary: 'Mock BART summary.',
+            summary: 'Mock default summary.',
+            action_items: ['Mock action 1', 'Mock action 2'],
+            transcript: 'Mock transcript...',
+            duration_seconds: 42.0
+          }), 900));
+        } else {
+          const res = await fetch(BACKEND_URL, { method: 'POST', body: formData });
+          const contentType = res.headers.get('content-type') || '';
+          let json = {};
+          if (contentType.includes('application/json')) {
+            json = await res.json();
+          } else {
+            const text = await res.text();
+            try { json = JSON.parse(text); } catch { throw new Error(text || 'Server error'); }
+          }
+          if (!res.ok) {
+            throw new Error(json.detail || json.error || 'Request failed');
+          }
+          data = json;
+        }
+
+        progressBar.style.width = '90%';
+        renderResults(data);
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'Network error', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Initialization
+    setMediaType('audio');
+  </script>
+</body>
+</html>
